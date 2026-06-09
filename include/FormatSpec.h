@@ -639,3 +639,21 @@ namespace LoopFormat { struct ActiveVoice; }
  *      LOOP_AUDIO_BLOCK_SIZE=512  (override in project settings)
  * ─────────────────────────────────────────────────────────────────────────────
  */
+
+#include <fstream>
+#include <string>
+#include <mutex>
+
+namespace LoopFormat
+{
+    inline void logDebug(const std::string& msg)
+    {
+        static std::mutex logMutex;
+        std::lock_guard<std::mutex> lock(logMutex);
+        std::ofstream logFile("debug.log", std::ios::app);
+        if (logFile.is_open())
+        {
+            logFile << msg << std::endl;
+        }
+    }
+}

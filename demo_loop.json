@@ -1,0 +1,28 @@
+{
+  "project": "Demo Cello Beat",
+  "author": "Antigravity",
+  "time_signature_num": 4,
+  "time_signature_den": 4,
+  "samples": [
+    {
+      "id": 0,
+      "name": "cello_low",
+      "path": "build/_deps/juce-src/examples/Assets/cello.wav",
+      "loop_bpm": 120.0,
+      "base_note": 48.0
+    },
+    {
+      "id": 1,
+      "name": "cello_high",
+      "path": "build/_deps/juce-src/examples/Assets/cello.wav",
+      "loop_bpm": 120.0,
+      "base_note": 60.0
+    }
+  ],
+  "events": [
+    { "tick": 0, "sample_name": "cello_low", "velocity": 100, "duration": 1920, "one_shot": false },
+    { "tick": 960, "sample_name": "cello_high", "velocity": 85, "duration": 960, "one_shot": true },
+    { "tick": 1920, "sample_name": "cello_low", "velocity": 90, "duration": 1920, "one_shot": false },
+    { "tick": 2880, "sample_name": "cello_high", "velocity": 110, "duration": 960, "one_shot": true }
+  ]
+}

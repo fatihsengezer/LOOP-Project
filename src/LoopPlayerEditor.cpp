@@ -686,6 +686,7 @@ LoopPlayerEditor::LoopPlayerEditor(LoopPlayerProcessor& processor)
     : AudioProcessorEditor(processor)
     , processor_(processor)
 {
+    logDebug("LoopPlayerEditor ctor start");
     setLookAndFeel(&laf_);
     setResizable(true, true);
     setResizeLimits(kMinW, kMinH, 1920, 1080);
@@ -695,13 +696,37 @@ LoopPlayerEditor::LoopPlayerEditor(LoopPlayerProcessor& processor)
     buildBpmKnob();
     connectApvts();
 
+    // Mode toggles
+    playerModeBtn_.setClickingTogglesState (true);
+    creatorModeBtn_.setClickingTogglesState (true);
+    playerModeBtn_.setToggleState (true, juce::dontSendNotification);
+    creatorModeBtn_.setToggleState (false, juce::dontSendNotification);
+    playerModeBtn_.onClick = [this] { setViewMode (true); };
+    creatorModeBtn_.onClick = [this] { setViewMode (false); };
+    addAndMakeVisible (playerModeBtn_);
+    addAndMakeVisible (creatorModeBtn_);
+
+    logDebug("LoopPlayerEditor ctor: creating LoopCreatorView");
+    creatorView_ = std::make_unique<LoopCreatorView> (processor_, [this](const juce::File& tempFile) {
+        tryLoadFile (tempFile);
+    });
+    addAndMakeVisible (creatorView_.get());
+
     // If a file is already loaded (e.g. session restore) refresh the grid
     if (processor_.hasFileLoaded())
+    {
+        logDebug("LoopPlayerEditor ctor: session restore file loaded, refreshing sequence data");
         refreshSequenceData();
+    }
 
     updateFileLabel();
     startTimerHz(kTimerHz);
+
+    setViewMode (true);
+
+    logDebug("LoopPlayerEditor ctor: setting size");
     setSize(kDefaultW, kDefaultH);
+    logDebug("LoopPlayerEditor ctor done");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -744,20 +769,17 @@ void LoopPlayerEditor::buildComponents()
     addAndMakeVisible(browseButton_);
 
     // Beat grid
-    auto* grid = new BeatGridComponent();
-    beatGrid_ = grid;
-    beatGrid_->onSeekRequested = [this](uint32_t tick)
+    beatGrid_.onSeekRequested = [this](uint32_t tick)
     {
         processor_.transportSeek(tick);
     };
-    beatGrid_->onMuteToggled = [this](uint16_t /*id*/, bool /*muted*/)
+    beatGrid_.onMuteToggled = [this](uint16_t /*id*/, bool /*muted*/)
     {
         syncMutesToSequencer();
     };
     addAndMakeVisible(beatGrid_);
 
     // Voice meter
-    voiceMeter_ = new VoiceMeterComponent();
     addAndMakeVisible(voiceMeter_);
 
     // BPM title
@@ -850,27 +872,30 @@ void LoopPlayerEditor::paint(juce::Graphics& g)
     g.drawLine(0.f, static_cast<float>(kHeaderH),
                static_cast<float>(getWidth()), static_cast<float>(kHeaderH), 1.f);
 
-    // Bottom panel background
-    const int bottomY = getHeight() - kBottomH - kStatusH;
-    g.setColour(EditorColors::Surface);
-    g.fillRect(0, bottomY, getWidth(), kBottomH);
-    g.setColour(EditorColors::Border);
-    g.drawLine(0.f, static_cast<float>(bottomY),
-               static_cast<float>(getWidth()), static_cast<float>(bottomY), 1.f);
+    if (isPlayerMode_)
+    {
+        // Bottom panel background
+        const int bottomY = getHeight() - kBottomH - kStatusH;
+        g.setColour(EditorColors::Surface);
+        g.fillRect(0, bottomY, getWidth(), kBottomH);
+        g.setColour(EditorColors::Border);
+        g.drawLine(0.f, static_cast<float>(bottomY),
+                   static_cast<float>(getWidth()), static_cast<float>(bottomY), 1.f);
 
-    // Status bar background
-    g.setColour(juce::Colour(0xFF0A0E13));
-    g.fillRect(0, getHeight() - kStatusH, getWidth(), kStatusH);
-    g.setColour(EditorColors::Border);
-    g.drawLine(0.f, static_cast<float>(getHeight() - kStatusH),
-               static_cast<float>(getWidth()), static_cast<float>(getHeight() - kStatusH), 1.f);
+        // Status bar background
+        g.setColour(juce::Colour(0xFF0A0E13));
+        g.fillRect(0, getHeight() - kStatusH, getWidth(), kStatusH);
+        g.setColour(EditorColors::Border);
+        g.drawLine(0.f, static_cast<float>(getHeight() - kStatusH),
+                   static_cast<float>(getWidth()), static_cast<float>(getHeight() - kStatusH), 1.f);
 
-    // Vertical divider between transport and voice meter
-    const int meterW = 160;
-    const int divX   = getWidth() - meterW;
-    g.setColour(EditorColors::Border);
-    g.drawLine(static_cast<float>(divX), static_cast<float>(bottomY),
-               static_cast<float>(divX), static_cast<float>(getHeight() - kStatusH), 1.f);
+        // Vertical divider between transport and voice meter
+        const int meterW = 160;
+        const int divX   = getWidth() - meterW;
+        g.setColour(EditorColors::Border);
+        g.drawLine(static_cast<float>(divX), static_cast<float>(bottomY),
+                   static_cast<float>(divX), static_cast<float>(getHeight() - kStatusH), 1.f);
+    }
 
     // Drag-over overlay
     if (isDraggingFile_)
@@ -904,12 +929,22 @@ void LoopPlayerEditor::resized()
     const int headerPad = 10;
     logoLabel_.setBounds(headerPad, 0, 70, kHeaderH);
     browseButton_.setBounds(w - 100 - headerPad, (kHeaderH - 26) / 2, 100, 26);
-    fileLabel_.setBounds(80, 0, w - 80 - 120, kHeaderH);
+
+    // Segmented button toggles for mode selection
+    const int toggleW = 80;
+    const int toggleX = w - 100 - headerPad - toggleW * 2 - 20;
+    playerModeBtn_.setBounds(toggleX, (kHeaderH - 26) / 2, toggleW, 26);
+    creatorModeBtn_.setBounds(toggleX + toggleW, (kHeaderH - 26) / 2, toggleW, 26);
+
+    fileLabel_.setBounds(80, 0, toggleX - 90, kHeaderH);
+
+    if (creatorView_ != nullptr)
+        creatorView_->setBounds(0, kHeaderH + 1, w, h - kHeaderH - 1);
 
     // ── Beat grid ───────────────────────────────────────────────────────────
     const int gridTop  = kHeaderH + 1;
     const int gridBot  = h - kBottomH - kStatusH;
-    beatGrid_->setBounds(0, gridTop, w, gridBot - gridTop);
+    beatGrid_.setBounds(0, gridTop, w, gridBot - gridTop);
 
     // ── Bottom panel ────────────────────────────────────────────────────────
     const int bottomY  = gridBot;
@@ -935,7 +970,7 @@ void LoopPlayerEditor::resized()
     bpmTitleLabel_.setBounds(knobX, bottomY + 4, knobSize, 14);
 
     // Voice meter (right side of bottom panel)
-    voiceMeter_->setBounds(w - meterW, bottomY + 4, meterW, kBottomH - 8);
+    voiceMeter_.setBounds(w - meterW, bottomY + 4, meterW, kBottomH - 8);
 
     // ── Status bar ──────────────────────────────────────────────────────────
     statusLabel_.setBounds(8, h - kStatusH, w - 16, kStatusH);
@@ -947,6 +982,9 @@ void LoopPlayerEditor::resized()
 
 void LoopPlayerEditor::timerCallback()
 {
+    if (! isPlayerMode_)
+        return;
+
     const bool hasFile = processor_.hasFileLoaded();
 
     // Detect file load / unload
@@ -956,7 +994,7 @@ void LoopPlayerEditor::timerCallback()
         if (hasFile)
             refreshSequenceData();
         else
-            beatGrid_->clearEvents();
+            beatGrid_.clearEvents();
 
         updateFileLabel();
     }
@@ -970,14 +1008,14 @@ void LoopPlayerEditor::timerCallback()
             if (tick != lastPlayheadTick_)
             {
                 lastPlayheadTick_ = tick;
-                beatGrid_->setPlayheadTick(tick);
+                beatGrid_.setPlayheadTick(tick);
             }
 
             const int voices = seq->getActiveVoiceCount();
             if (voices != lastVoiceCount_)
             {
                 lastVoiceCount_ = voices;
-                voiceMeter_->setActiveVoiceCount(voices);
+                voiceMeter_.setActiveVoiceCount(voices);
             }
 
             // Update status strip with timing info
@@ -1108,7 +1146,7 @@ void LoopPlayerEditor::refreshSequenceData()
     const auto* reader = processor_.getReader();
     if (!reader || !reader->isValid())
     {
-        beatGrid_->clearEvents();
+        beatGrid_.clearEvents();
         return;
     }
 
@@ -1139,9 +1177,9 @@ void LoopPlayerEditor::refreshSequenceData()
         evts.push_back(ce);
     }
 
-    beatGrid_->setEvents(std::move(evts),
-                          seqHdr.total_duration_ticks,
-                          static_cast<uint32_t>(fileHdr.tpqn));
+    beatGrid_.setEvents(std::move(evts),
+                         seqHdr.total_duration_ticks,
+                         static_cast<uint32_t>(fileHdr.tpqn));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1179,12 +1217,44 @@ void LoopPlayerEditor::syncMutesToSequencer()
     auto* seq = processor_.getSequencer();
     if (!seq) return;
 
-    const auto& mutedIds = beatGrid_->getMutedIds();
+    const auto& mutedIds = beatGrid_.getMutedIds();
     uint64_t mask = 0;
     for (uint16_t id : mutedIds)
         if (id < 64) mask |= (1ULL << id);
 
     seq->setMutedMask(mask);
+}
+
+void LoopPlayerEditor::setViewMode (bool isPlayerMode)
+{
+    isPlayerMode_ = isPlayerMode;
+
+    playerModeBtn_.setToggleState (isPlayerMode, juce::dontSendNotification);
+    creatorModeBtn_.setToggleState (!isPlayerMode, juce::dontSendNotification);
+
+    const auto visibility = isPlayerMode;
+    beatGrid_.setVisible (visibility);
+    voiceMeter_.setVisible (visibility);
+    fileLabel_.setVisible (visibility);
+    browseButton_.setVisible (visibility);
+    playButton_.setVisible (visibility);
+    pauseButton_.setVisible (visibility);
+    stopButton_.setVisible (visibility);
+    loopButton_.setVisible (visibility);
+    bpmKnob_.setVisible (visibility);
+    bpmTitleLabel_.setVisible (visibility);
+    statusLabel_.setVisible (visibility);
+
+    if (creatorView_ != nullptr)
+        creatorView_->setVisible (!isPlayerMode);
+
+    if (!isPlayerMode)
+    {
+        processor_.transportStop();
+    }
+
+    resized();
+    repaint();
 }
 
 } // namespace LoopFormat

@@ -298,6 +298,7 @@ private:
         uint32_t       playFrames { 0 };
         uint32_t       startOffset{ 0 };       ///< Intra-block trigger offset
         uint32_t       totalFramesToPlay { 0 };
+        double         sampleRateRatio { 1.0 };
         float          gainLinear { 1.f };
         uint8_t        channels   { 1 };
         uint8_t        bitDepth   { 16 };

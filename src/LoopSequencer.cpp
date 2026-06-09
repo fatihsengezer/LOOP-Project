@@ -405,8 +405,9 @@ void LoopSequencer::scheduleLookAhead(uint32_t blockStartTick,
         }
 
         // Compute how many frames to play
+        const double ratio = (sampleRate_ > 0.0) ? (static_cast<double>(lut.sample_rate) / sampleRate_) : 1.0;
         uint32_t playFrames = lut.frame_count;
-        uint32_t totalFramesToPlay = lut.frame_count;
+        uint32_t totalFramesToPlay = static_cast<uint32_t>(static_cast<double>(lut.frame_count) / ratio);
 
         if (!evt.isOneShot())
         {
@@ -431,6 +432,7 @@ void LoopSequencer::scheduleLookAhead(uint32_t blockStartTick,
                 trig.playFrames  = playFrames;
                 trig.startOffset = static_cast<uint32_t>(startOffset);
                 trig.totalFramesToPlay = totalFramesToPlay;
+                trig.sampleRateRatio = ratio;
                 trig.gainLinear  = kVelocityTable.gain(evt.velocity());
                 trig.channels    = lut.channels;
                 trig.bitDepth    = lut.bitDepth();
@@ -475,7 +477,8 @@ void LoopSequencer::drainPendingFifo() noexcept
         slot->channels    = trig.channels;
         slot->bitDepth    = trig.bitDepth;
         slot->oneShot     = trig.oneShot;
-        slot->readPos     = 0;
+        slot->sampleRateRatio = trig.sampleRateRatio;
+        slot->readPos     = 0.0;
         slot->framesPlayed = 0;
         slot->active      = true;  // Must be LAST — activates the voice
     };
@@ -556,7 +559,7 @@ void LoopSequencer::renderVoices(int numSamples, int numOutputCh) noexcept
             }
 
             // Loop boundary check: wrap or stop
-            if (v.readPos >= v.playFrames)
+            if (v.readPos >= static_cast<double>(v.playFrames))
             {
                 if (v.oneShot)
                 {
@@ -565,53 +568,79 @@ void LoopSequencer::renderVoices(int numSamples, int numOutputCh) noexcept
                 }
                 else
                 {
-                    v.readPos = 0; // Loop back to start
+                    v.readPos = std::fmod(v.readPos, static_cast<double>(v.playFrames));
                 }
             }
 
             // Guard: don't read past the actual PCM data
-            if (v.readPos >= v.frameCount)
+            if (v.readPos >= static_cast<double>(v.frameCount))
             {
                 v.active = false;
                 break;
             }
 
-            // Pointer to the current frame's first byte
-            const uint8_t* framePtr = v.pcmPtr + v.readPos * bytesPerFrame;
+            // Resampling Linear Interpolation:
+            const double pos = v.readPos;
+            const uint32_t idx1 = static_cast<uint32_t>(pos);
+            const uint32_t idx2 = (idx1 + 1 < v.frameCount) ? idx1 + 1 : idx1;
+            const float frac = static_cast<float>(pos - static_cast<double>(idx1));
 
-            // Decode and accumulate
+            // Pointer to the frame bytes
+            const uint8_t* framePtr1 = v.pcmPtr + idx1 * bytesPerFrame;
+            const uint8_t* framePtr2 = v.pcmPtr + idx2 * bytesPerFrame;
+
+            float valL = 0.f;
+            float valR = 0.f;
+
+            // Decode and accumulate with linear interpolation
             if (v.bitDepth == 16)
             {
                 if (v.channels == 1)
                 {
-                    const float samp = readInt16ToFloat(framePtr) * v.gainLinear;
-                    outL[s] += samp;
-                    outR[s] += samp; // upmix mono → stereo
+                    const float s1 = readInt16ToFloat(framePtr1) * v.gainLinear;
+                    const float s2 = readInt16ToFloat(framePtr2) * v.gainLinear;
+                    valL = (1.f - frac) * s1 + frac * s2;
+                    valR = valL; // upmix mono → stereo
                 }
                 else // stereo
                 {
-                    outL[s] += readInt16ToFloat(framePtr)     * v.gainLinear;
-                    outR[s] += readInt16ToFloat(framePtr + 2) * v.gainLinear;
+                    const float s1L = readInt16ToFloat(framePtr1)     * v.gainLinear;
+                    const float s1R = readInt16ToFloat(framePtr1 + 2) * v.gainLinear;
+                    const float s2L = readInt16ToFloat(framePtr2)     * v.gainLinear;
+                    const float s2R = readInt16ToFloat(framePtr2 + 2) * v.gainLinear;
+                    valL = (1.f - frac) * s1L + frac * s2L;
+                    valR = (1.f - frac) * s1R + frac * s2R;
                 }
             }
             else // 24-bit
             {
                 if (v.channels == 1)
                 {
-                    const float samp = readInt24ToFloat(framePtr) * v.gainLinear;
-                    outL[s] += samp;
-                    outR[s] += samp;
+                    const float s1 = readInt24ToFloat(framePtr1) * v.gainLinear;
+                    const float s2 = readInt24ToFloat(framePtr2) * v.gainLinear;
+                    valL = (1.f - frac) * s1 + frac * s2;
+                    valR = valL;
                 }
-                else
+                else // stereo
                 {
-                    outL[s] += readInt24ToFloat(framePtr)     * v.gainLinear;
-                    outR[s] += readInt24ToFloat(framePtr + 3) * v.gainLinear;
+                    const float s1L = readInt24ToFloat(framePtr1)     * v.gainLinear;
+                    const float s1R = readInt24ToFloat(framePtr1 + 3) * v.gainLinear;
+                    const float s2L = readInt24ToFloat(framePtr2)     * v.gainLinear;
+                    const float s2R = readInt24ToFloat(framePtr2 + 3) * v.gainLinear;
+                    valL = (1.f - frac) * s1L + frac * s2L;
+                    valR = (1.f - frac) * s1R + frac * s2R;
                 }
             }
 
-            ++v.readPos;
+            outL[s] += valL;
+            outR[s] += valR;
+
+            v.readPos += v.sampleRateRatio;
             ++v.framesPlayed;
         }
+
+        // Reset startOffset after the first block is rendered so subsequent blocks start at sample 0.
+        v.startOffset = 0;
     }
 }
 

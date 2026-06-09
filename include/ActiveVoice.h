@@ -145,11 +145,16 @@ struct ActiveVoice
     /// If false: loop back to frame 0 after `playFrames` frames.
     bool           oneShot       { false };
 
+    uint8_t        _pad1[1]      { 0 }; ///< Padding before double
+
+    /// Ratio of (fileSampleRate / hostSampleRate) to advance readPos
+    double         sampleRateRatio { 1.0 };
+
     // ── Mutable during render ────────────────────────────────────────────────
 
-    /// Current read position within the PCM data, in frames.
+    /// Current read position within the PCM data, in frames (fractional for resampling).
     /// Advanced by the render loop every processBlock().
-    uint32_t       readPos       { 0 };
+    double         readPos       { 0.0 };
 
     /// Total number of frames rendered so far by this voice.
     uint32_t       framesPlayed  { 0 };
@@ -162,7 +167,7 @@ struct ActiveVoice
     /// but see the FIFO note in the file header if you add multi-threading.
     bool           active        { false };
 
-    uint8_t        _pad[3]       { 0, 0, 0 }; ///< Maintain 4-byte alignment
+    uint8_t        _pad2[3]      { 0, 0, 0 }; ///< Maintain 8-byte structure alignment
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -181,7 +186,8 @@ struct ActiveVoice
         channels          = 1;
         bitDepth          = 16;
         oneShot           = false;
-        readPos           = 0;
+        sampleRateRatio   = 1.0;
+        readPos           = 0.0;
         framesPlayed      = 0;
         active            = false;
     }
@@ -197,7 +203,7 @@ struct ActiveVoice
     }
 };
 
-static_assert(sizeof(ActiveVoice) == 48,
+static_assert(sizeof(ActiveVoice) == 56,
     "ActiveVoice size changed — update pool cache-size calculation in README");
 
 
@@ -258,12 +264,12 @@ void readVoiceFrame(const ActiveVoice& voice,
                     float*             output) noexcept
 {
     assert(voice.pcmPtr && "readVoiceFrame called with null pcmPtr");
-    assert(voice.readPos < voice.frameCount);
+    assert(static_cast<uint32_t>(voice.readPos) < voice.frameCount);
 
     const uint32_t bytesPerSample = (voice.bitDepth == 24) ? 3u : 2u;
     const uint32_t bytesPerFrame  = bytesPerSample * voice.channels;
     const uint8_t* framePtr       = voice.pcmPtr
-                                  + voice.readPos * bytesPerFrame;
+                                  + static_cast<size_t>(voice.readPos) * bytesPerFrame;
 
     if (voice.bitDepth == 16)
     {

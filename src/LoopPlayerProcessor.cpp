@@ -110,6 +110,7 @@ LoopPlayerProcessor::LoopPlayerProcessor()
                          .withOutput("Output", juce::AudioChannelSet::stereo(), true))
     , apvts(*this, nullptr, "LOOP_STATE", createParameterLayout())
 {
+    logDebug("LoopPlayerProcessor ctor start");
     // Register as APVTS listener for all parameters
     apvts.addParameterListener(kParamBPM,           this);
     apvts.addParameterListener(kParamMasterGain,     this);
@@ -118,6 +119,7 @@ LoopPlayerProcessor::LoopPlayerProcessor()
 
     // Initialise velocity override array to 0 (no override)
     midiVelocityOverride_.fill(0);
+    logDebug("LoopPlayerProcessor ctor done");
 }
 
 LoopPlayerProcessor::~LoopPlayerProcessor()
@@ -224,12 +226,17 @@ void LoopPlayerProcessor::unloadFile()
 void LoopPlayerProcessor::prepareToPlay(double sampleRate,
                                          int    maximumExpectedSamplesPerBlock)
 {
+    logDebug("LoopPlayerProcessor::prepareToPlay sr=" + std::to_string(sampleRate) + " bs=" + std::to_string(maximumExpectedSamplesPerBlock));
     cachedSampleRate_.store(sampleRate,                     std::memory_order_release);
     cachedBlockSize_.store(maximumExpectedSamplesPerBlock,  std::memory_order_release);
     deviceIsPrepared_.store(true,                           std::memory_order_release);
 
     if (sequencer_ && fileReady_.load(std::memory_order_acquire))
+    {
+        logDebug("LoopPlayerProcessor::prepareToPlay: preparing sequencer");
         sequencer_->prepareToPlay(maximumExpectedSamplesPerBlock, sampleRate);
+    }
+    logDebug("LoopPlayerProcessor::prepareToPlay done");
 }
 
 

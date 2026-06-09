@@ -35,6 +35,7 @@
 #pragma once
 
 #include "LoopPlayerProcessor.h"
+#include "LoopCreatorView.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -286,13 +287,21 @@ private:
     LoopLookAndFeel      laf_;       ///< must outlive all child components
 
     // ── Sub-components ────────────────────────────────────────────────────────
-    BeatGridComponent*   beatGrid_   = nullptr;
-    VoiceMeterComponent* voiceMeter_ = nullptr;
+    BeatGridComponent    beatGrid_;
+    VoiceMeterComponent  voiceMeter_;
 
     // Header widgets
     juce::Label      logoLabel_;
     juce::Label      fileLabel_;
     juce::TextButton browseButton_ { "Browse\xe2\x80\xa6" }; // "Browse…"
+
+    // Mode Toggle
+    juce::TextButton playerModeBtn_  { "PLAYER" };
+    juce::TextButton creatorModeBtn_ { "CREATOR" };
+    bool             isPlayerMode_ = true;
+    void             setViewMode (bool isPlayerMode);
+
+    std::unique_ptr<LoopCreatorView> creatorView_;
 
     // Transport widgets
     juce::TextButton playButton_  { "\xe2\x96\xb6" };   // ▶

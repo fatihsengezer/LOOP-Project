@@ -1,0 +1,52 @@
+LoopPlayerProcessor ctor start
+LoopPlayerProcessor ctor done
+LoopPlayerProcessor::prepareToPlay sr=48000.000000 bs=480
+LoopPlayerProcessor::prepareToPlay done
+LoopPlayerEditor ctor start
+LoopPlayerEditor ctor: creating LoopCreatorView
+LoopCreatorView ctor start
+LoopCreatorView ctor: creating TimelineEditorComponent
+LoopCreatorView ctor done
+LoopCreatorView::resized start
+LoopPlayerEditor ctor: setting size
+LoopCreatorView::resized start
+LoopPlayerEditor ctor done
+LoopPlayerProcessor ctor start
+LoopPlayerProcessor ctor done
+LoopPlayerProcessor::prepareToPlay sr=48000.000000 bs=480
+LoopPlayerProcessor::prepareToPlay done
+LoopPlayerEditor ctor start
+LoopPlayerEditor ctor: creating LoopCreatorView
+LoopCreatorView ctor start
+LoopCreatorView ctor: creating TimelineEditorComponent
+LoopCreatorView ctor done
+LoopCreatorView::resized start
+LoopPlayerEditor ctor: setting size
+LoopCreatorView::resized start
+LoopPlayerEditor ctor done
+LoopPlayerProcessor ctor start
+LoopPlayerProcessor ctor done
+LoopPlayerProcessor::prepareToPlay sr=48000.000000 bs=480
+LoopPlayerProcessor::prepareToPlay done
+LoopPlayerEditor ctor start
+LoopPlayerEditor ctor: creating LoopCreatorView
+LoopCreatorView ctor start
+LoopCreatorView ctor: creating TimelineEditorComponent
+LoopCreatorView ctor done
+LoopCreatorView::resized start
+LoopPlayerEditor ctor: setting size
+LoopCreatorView::resized start
+LoopPlayerEditor ctor done
+LoopPlayerProcessor ctor start
+LoopPlayerProcessor ctor done
+LoopPlayerProcessor::prepareToPlay sr=48000.000000 bs=480
+LoopPlayerProcessor::prepareToPlay done
+LoopPlayerEditor ctor start
+LoopPlayerEditor ctor: creating LoopCreatorView
+LoopCreatorView ctor start
+LoopCreatorView ctor: creating TimelineEditorComponent
+LoopCreatorView ctor done
+LoopCreatorView::resized start
+LoopPlayerEditor ctor: setting size
+LoopCreatorView::resized start
+LoopPlayerEditor ctor done

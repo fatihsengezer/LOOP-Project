@@ -75,6 +75,7 @@ target_sources(LOOPPlayer
         src/LoopSequencer.cpp
         src/LoopPlayerProcessor.cpp
         src/LoopPlayerEditor.cpp
+        src/LoopCreatorView.cpp
 )
 
 target_include_directories(LOOPPlayer PRIVATE include)
@@ -84,6 +85,7 @@ target_compile_definitions(LOOPPlayer
         JUCE_STRICT_REFCOUNTEDPOINTER=1
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
+        JUCE_VST3_CAN_REPLACE_VST2=0
         LOOP_AUDIO_BLOCK_SIZE=512
         $<$<CONFIG:Debug>:JUCE_ENABLE_REPAINT_DEBUGGING=0>
         $<$<CONFIG:Debug>:JUCE_CHECK_MEMORY_LEAKS=1>
@@ -217,6 +219,24 @@ target_link_libraries(LOOPTests_ZeroCrossing
         juce::juce_core
         juce::juce_audio_basics
         juce::juce_gui_basics
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags
+)
+
+
+# ── LOOPCompiler ─────────────────────────────────────────────────────────────
+# Command-line tool to compile WAV files and a JSON config into a .LOOP file.
+add_executable(LOOPCompiler
+    src/LoopCompiler.cpp
+    src/LoopFileWriter.cpp
+    src/LoopFileReader.cpp
+)
+loop_test_target(LOOPCompiler)
+target_link_libraries(LOOPCompiler
+    PRIVATE
+        juce::juce_core
+        juce::juce_audio_basics
+        juce::juce_audio_formats
         juce::juce_recommended_config_flags
         juce::juce_recommended_warning_flags
 )

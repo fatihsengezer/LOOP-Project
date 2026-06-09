@@ -447,7 +447,7 @@ static void test_structSizes()
     EXPECT_EQ(sizeof(LoopFormat::SequenceHeader),  32u, "SequenceHeader must be 32 bytes");
     EXPECT_EQ(sizeof(LoopFormat::SequenceEvent),    8u, "SequenceEvent must be 8 bytes");
     EXPECT_EQ(sizeof(LoopFormat::MetaChunkHeader), 16u, "MetaChunkHeader must be 16 bytes");
-    EXPECT_EQ(sizeof(LoopFormat::ActiveVoice),     48u, "ActiveVoice must be 48 bytes");
+    EXPECT_EQ(sizeof(LoopFormat::ActiveVoice),     56u, "ActiveVoice must be 56 bytes");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
